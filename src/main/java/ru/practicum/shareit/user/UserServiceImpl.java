@@ -10,6 +10,7 @@ import ru.practicum.shareit.user.dto.UserDto;
 import ru.practicum.shareit.user.storage.UserRepository;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -17,6 +18,10 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+
+    // Простая вменяемая проверка: есть локальная часть, @, домен и точка в домене
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     @Override
     public UserDto create(UserDto userDto) {
@@ -42,6 +47,9 @@ public class UserServiceImpl implements UserService {
         }
         if (StringUtils.hasText(patch.getEmail())) {
             String newEmail = patch.getEmail();
+            if (!isValidEmail(newEmail)) {
+                throw new ValidationException("email is invalid");
+            }
             boolean emailTaken = userRepository.findAll().stream()
                     .anyMatch(u -> !u.getId().equals(userId) && u.getEmail().equalsIgnoreCase(newEmail));
             if (emailTaken) {
@@ -78,5 +86,12 @@ public class UserServiceImpl implements UserService {
         if (!StringUtils.hasText(dto.getEmail())) {
             throw new ValidationException("email must not be blank");
         }
+        if (!isValidEmail(dto.getEmail())) {
+            throw new ValidationException("email is invalid");
+        }
+    }
+
+    private boolean isValidEmail(String email) {
+        return EMAIL_PATTERN.matcher(email).matches();
     }
 }
