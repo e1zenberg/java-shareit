@@ -61,7 +61,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public ItemDto getById(Long requesterId, Long itemId) {
-        // requesterId пока не используется, но оставлен для совместимости с дальнейшими спринтами
+        // requesterId оставлен для будущих спринтов
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new NotFoundException("Item not found: " + itemId));
         return ItemMapper.toItemDto(item);
@@ -69,7 +69,6 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public List<ItemDto> getByOwner(Long ownerId) {
-        // проверим существование владельца для единообразия ошибок
         userRepository.findById(ownerId)
                 .orElseThrow(() -> new NotFoundException("Owner not found: " + ownerId));
         return itemRepository.findByOwnerId(ownerId).stream()
@@ -80,18 +79,19 @@ public class ItemServiceImpl implements ItemService {
     @Override
     public List<ItemDto> search(String text) {
         if (!StringUtils.hasText(text)) {
-            return List.of(); // возвращаем пустой список, если текст пуст
+            return List.of(); // пустой поисковый текст -> пустой результат
         }
-        final String q = text.toLowerCase(Locale.ROOT);
+        final String query = text.toLowerCase(Locale.ROOT); // говорящая переменная
         return itemRepository.findAll().stream()
                 .filter(Item::getAvailable)
-                .filter(i -> containsIgnoreCase(i.getName(), q) || containsIgnoreCase(i.getDescription(), q))
+                .filter(item -> containsIgnoreCase(item.getName(), query)
+                        || containsIgnoreCase(item.getDescription(), query))
                 .map(ItemMapper::toItemDto)
                 .collect(Collectors.toList());
     }
 
-    private boolean containsIgnoreCase(String src, String q) {
-        return src != null && src.toLowerCase(Locale.ROOT).contains(q);
+    private boolean containsIgnoreCase(String source, String query) {
+        return source != null && source.toLowerCase(Locale.ROOT).contains(query);
     }
 
     private void validateNew(ItemDto dto) {

@@ -14,7 +14,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ItemController {
 
+    // во избежание дубляжей общие строки вынесены в константы
     public static final String USER_HEADER = "X-Sharer-User-Id";
+    private static final String ITEM_ID_PATH = "/{itemId}";
 
     private final ItemService itemService;
 
@@ -24,14 +26,14 @@ public class ItemController {
         return itemService.create(userId, itemDto);
     }
 
-    @PatchMapping("/{itemId}")
+    @PatchMapping(ITEM_ID_PATH)
     public ItemDto update(@RequestHeader(USER_HEADER) Long userId,
                           @PathVariable Long itemId,
                           @RequestBody ItemDto patch) {
         return itemService.update(userId, itemId, patch);
     }
 
-    @GetMapping("/{itemId}")
+    @GetMapping(ITEM_ID_PATH)
     public ItemDto getById(@RequestHeader(USER_HEADER) Long userId,
                            @PathVariable Long itemId) {
         return itemService.getById(userId, itemId);
