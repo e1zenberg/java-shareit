@@ -53,7 +53,6 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- добавлено: in-memory БД для тестов -->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
@@ -95,6 +94,13 @@
 					</plugin>
 				</plugins>
 			</build>
+		</profile>
+
+		<profile>
+			<id>check</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
 		</profile>
 	</profiles>
 </project>
