@@ -10,6 +10,7 @@ import ru.practicum.shareit.booking.dto.BookingCreateDto;
 import ru.practicum.shareit.booking.dto.BookingDto;
 import ru.practicum.shareit.booking.dto.BookingState;
 import ru.practicum.shareit.exception.ConflictException;
+import ru.practicum.shareit.exception.ForbiddenException;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.exception.ValidationException;
 import ru.practicum.shareit.item.model.Item;
@@ -42,25 +43,24 @@ public class BookingServiceImpl implements BookingService {
         if (!dto.start().isBefore(dto.end())) {
             throw new ValidationException("start must be before end");
         }
-        final LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
         if (dto.start().isBefore(now) || dto.end().isBefore(now)) {
             throw new ValidationException("start/end must be in the future");
         }
 
-        final User booker = userRepository.findById(userId)
+        User booker = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
-        final Item item = itemRepository.findById(dto.itemId())
+        Item item = itemRepository.findById(dto.itemId())
                 .orElseThrow(() -> new NotFoundException("Item not found: " + dto.itemId()));
 
         if (item.getOwner() != null && Objects.equals(item.getOwner().getId(), userId)) {
-            // по ТЗ бронировать свою вещь нельзя
             throw new NotFoundException("Owner cannot book own item");
         }
         if (!Boolean.TRUE.equals(item.getAvailable())) {
             throw new ValidationException("Item is not available for booking");
         }
 
-        final Booking entity = Booking.builder()
+        Booking booking = Booking.builder()
                 .start(dto.start())
                 .end(dto.end())
                 .item(item)
@@ -68,17 +68,17 @@ public class BookingServiceImpl implements BookingService {
                 .status(BookingStatus.WAITING)
                 .build();
 
-        return BookingMapper.toDto(bookingRepository.save(entity));
+        return BookingMapper.toDto(bookingRepository.save(booking));
     }
 
     @Override
     public BookingDto approve(Long ownerId, Long bookingId, boolean approved) {
-        final Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new NotFoundException("Booking not found: " + bookingId));
 
-        final Long itemOwnerId = booking.getItem().getOwner().getId();
+        Long itemOwnerId = booking.getItem().getOwner().getId();
         if (!itemOwnerId.equals(ownerId)) {
-            throw new NotFoundException("Only item owner can approve/reject booking");
+            throw new ForbiddenException("Only item owner can approve/reject booking");
         }
         if (booking.getStatus() != BookingStatus.WAITING) {
             throw new ConflictException("Only WAITING booking can be changed");
@@ -90,11 +90,11 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingDto get(Long userId, Long bookingId) {
-        final Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new NotFoundException("Booking not found: " + bookingId));
 
-        final Long ownerId = booking.getItem().getOwner().getId();
-        final Long bookerId = booking.getBooker().getId();
+        Long ownerId = booking.getItem().getOwner().getId();
+        Long bookerId = booking.getBooker().getId();
         if (!ownerId.equals(userId) && !bookerId.equals(userId)) {
             throw new NotFoundException("Booking accessible only to booker or item owner");
         }
@@ -107,18 +107,33 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
         validatePage(from, size);
 
-        final LocalDateTime now = LocalDateTime.now();
-        final PageRequest pageRequest = PageRequest.of(from / size, size, SORT_BY_START_DESC);
+        LocalDateTime now = LocalDateTime.now();
+        PageRequest pageRequest = PageRequest.of(from / size, size, SORT_BY_START_DESC);
 
-        final Page<Booking> page = switch (state) {
-            case ALL -> bookingRepository.findByBooker_Id(userId, pageRequest);
-            case CURRENT -> bookingRepository.findByBooker_IdAndStartBeforeAndEndAfter(userId, now, now, pageRequest);
-            case PAST -> bookingRepository.findByBooker_IdAndEndBefore(userId, now, pageRequest);
-            case FUTURE -> bookingRepository.findByBooker_IdAndStartAfter(userId, now, pageRequest);
-            case WAITING -> bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.WAITING, pageRequest);
-            case REJECTED -> bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.REJECTED, pageRequest);
-        };
-        return page.getContent().stream().map(BookingMapper::toDto).toList();
+        Page<Booking> page;
+        switch (state) {
+            case CURRENT:
+                page = bookingRepository.findByBooker_IdAndStartBeforeAndEndAfter(userId, now, now, pageRequest);
+                break;
+            case PAST:
+                page = bookingRepository.findByBooker_IdAndEndBefore(userId, now, pageRequest);
+                break;
+            case FUTURE:
+                page = bookingRepository.findByBooker_IdAndStartAfter(userId, now, pageRequest);
+                break;
+            case WAITING:
+                page = bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.WAITING, pageRequest);
+                break;
+            case REJECTED:
+                page = bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.REJECTED, pageRequest);
+                break;
+            default:
+                page = bookingRepository.findByBooker_Id(userId, pageRequest);
+        }
+
+        return page.getContent().stream()
+                .map(BookingMapper::toDto)
+                .toList();
     }
 
     @Override
@@ -127,18 +142,33 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new NotFoundException("User not found: " + ownerId));
         validatePage(from, size);
 
-        final LocalDateTime now = LocalDateTime.now();
-        final PageRequest pageRequest = PageRequest.of(from / size, size, SORT_BY_START_DESC);
+        LocalDateTime now = LocalDateTime.now();
+        PageRequest pageRequest = PageRequest.of(from / size, size, SORT_BY_START_DESC);
 
-        final Page<Booking> page = switch (state) {
-            case ALL -> bookingRepository.findByItem_Owner_Id(ownerId, pageRequest);
-            case CURRENT -> bookingRepository.findByItem_Owner_IdAndStartBeforeAndEndAfter(ownerId, now, now, pageRequest);
-            case PAST -> bookingRepository.findByItem_Owner_IdAndEndBefore(ownerId, now, pageRequest);
-            case FUTURE -> bookingRepository.findByItem_Owner_IdAndStartAfter(ownerId, now, pageRequest);
-            case WAITING -> bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.WAITING, pageRequest);
-            case REJECTED -> bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.REJECTED, pageRequest);
-        };
-        return page.getContent().stream().map(BookingMapper::toDto).toList();
+        Page<Booking> page;
+        switch (state) {
+            case CURRENT:
+                page = bookingRepository.findByItem_Owner_IdAndStartBeforeAndEndAfter(ownerId, now, now, pageRequest);
+                break;
+            case PAST:
+                page = bookingRepository.findByItem_Owner_IdAndEndBefore(ownerId, now, pageRequest);
+                break;
+            case FUTURE:
+                page = bookingRepository.findByItem_Owner_IdAndStartAfter(ownerId, now, pageRequest);
+                break;
+            case WAITING:
+                page = bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.WAITING, pageRequest);
+                break;
+            case REJECTED:
+                page = bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.REJECTED, pageRequest);
+                break;
+            default:
+                page = bookingRepository.findByItem_Owner_Id(ownerId, pageRequest);
+        }
+
+        return page.getContent().stream()
+                .map(BookingMapper::toDto)
+                .toList();
     }
 
     private void validatePage(int from, int size) {

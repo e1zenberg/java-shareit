@@ -20,40 +20,38 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
 
     @Override
-    public User create(final User user) {
-        if (user == null) {
-            throw new ValidationException("User payload must not be null");
-        }
-        validateEmailOrThrow(user.getEmail());
-        if (!StringUtils.hasText(user.getName())) {
-            throw new ValidationException("name must not be blank");
+    public User create(User user) {
+        if (user == null || !StringUtils.hasText(user.getEmail()) || !SIMPLE_EMAIL.matcher(user.getEmail()).matches()) {
+            throw new ValidationException("email is invalid");
         }
         if (userRepository.existsByEmail(user.getEmail())) {
-            throw new ConflictException("Email already used: " + user.getEmail());
+            throw new ConflictException("email already used: " + user.getEmail());
         }
         return userRepository.save(user);
     }
 
     @Override
-    public User update(final Long id, final User patch) {
-        final User existing = userRepository.findById(id)
+    public User update(Long id, User patch) {
+        User actual = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
         if (patch == null) {
-            return existing;
+            return actual;
         }
         if (StringUtils.hasText(patch.getName())) {
-            existing.setName(patch.getName());
+            actual.setName(patch.getName());
         }
         if (patch.getEmail() != null) {
-            validateEmailOrThrow(patch.getEmail());
-            if (!patch.getEmail().equals(existing.getEmail())
-                    && userRepository.existsByEmail(patch.getEmail())) {
-                throw new ConflictException("Email already used: " + patch.getEmail());
+            if (!StringUtils.hasText(patch.getEmail()) || !SIMPLE_EMAIL.matcher(patch.getEmail()).matches()) {
+                throw new ValidationException("email is invalid");
             }
-            existing.setEmail(patch.getEmail());
+            if (!patch.getEmail().equalsIgnoreCase(actual.getEmail())
+                    && userRepository.existsByEmail(patch.getEmail())) {
+                throw new ConflictException("email already used: " + patch.getEmail());
+            }
+            actual.setEmail(patch.getEmail());
         }
-        return userRepository.save(existing);
+        return userRepository.save(actual);
     }
 
     @Override
@@ -70,14 +68,5 @@ public class UserServiceImpl implements UserService {
     @Override
     public void deleteById(Long id) {
         userRepository.deleteById(id);
-    }
-
-    private void validateEmailOrThrow(String email) {
-        if (!StringUtils.hasText(email)) {
-            throw new ValidationException("email must not be blank");
-        }
-        if (!SIMPLE_EMAIL.matcher(email).matches()) {
-            throw new ValidationException("email is invalid: " + email);
-        }
     }
 }
