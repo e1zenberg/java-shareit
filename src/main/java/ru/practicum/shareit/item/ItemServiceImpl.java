@@ -1,100 +1,177 @@
 package ru.practicum.shareit.item;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import ru.practicum.shareit.booking.Booking;
+import ru.practicum.shareit.booking.BookingMapper;
+import ru.practicum.shareit.booking.BookingRepository;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.exception.ValidationException;
+import ru.practicum.shareit.item.dto.CommentCreateDto;
+import ru.practicum.shareit.item.dto.CommentDto;
+import ru.practicum.shareit.item.dto.ItemDetailsDto;
 import ru.practicum.shareit.item.dto.ItemDto;
+import ru.practicum.shareit.item.dto.ItemWithBookingsDto;
+import ru.practicum.shareit.item.model.Comment;
 import ru.practicum.shareit.item.model.Item;
+import ru.practicum.shareit.item.storage.CommentRepository;
 import ru.practicum.shareit.item.storage.ItemRepository;
 import ru.practicum.shareit.user.User;
 import ru.practicum.shareit.user.storage.UserRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Сервис работы с вещами.
- */
 @Service
 @RequiredArgsConstructor
 public class ItemServiceImpl implements ItemService {
 
     private final ItemRepository itemRepository;
+    private final CommentRepository commentRepository;
+    private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
 
     @Override
-    public ItemDto create(Long ownerId, ItemDto dto) {
+    public ItemDto create(final Long ownerId, final ItemDto dto) {
         validateNew(dto);
-        User owner = userRepository.findById(ownerId)
-                .orElseThrow(() -> new NotFoundException("Owner not found: " + ownerId));
-        Item item = Item.builder()
+
+        final User owner = userRepository.findById(ownerId)
+                .orElseThrow(() -> new NotFoundException("User not found: " + ownerId));
+
+        final Item entity = Item.builder()
                 .name(dto.getName())
                 .description(dto.getDescription())
-                .available(Boolean.TRUE.equals(dto.getAvailable()))
+                .available(dto.getAvailable())
                 .owner(owner)
                 .build();
-        return ItemMapper.toItemDto(itemRepository.save(item));
+
+        final Item saved = itemRepository.save(entity);
+        return ItemMapper.toItemDto(saved);
     }
 
     @Override
-    public ItemDto update(Long ownerId, Long itemId, ItemDto patch) {
-        Item item = itemRepository.findById(itemId)
+    public ItemDto update(final Long ownerId, final Long itemId, final ItemDto patch) {
+        final Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new NotFoundException("Item not found: " + itemId));
-        if (item.getOwner() == null || !item.getOwner().getId().equals(ownerId)) {
-            throw new NotFoundException("Only owner can edit the item");
+
+        if (!item.getOwner().getId().equals(ownerId)) {
+            throw new NotFoundException("Only owner can edit item");
         }
 
-        if (StringUtils.hasText(patch.getName())) {
+        if (patch == null) {
+            throw new ValidationException("Item patch must not be null");
+        }
+        if (patch.getName() != null) {
+            if (!StringUtils.hasText(patch.getName())) {
+                throw new ValidationException("name must not be blank");
+            }
             item.setName(patch.getName());
         }
-        if (StringUtils.hasText(patch.getDescription())) {
+        if (patch.getDescription() != null) {
+            if (!StringUtils.hasText(patch.getDescription())) {
+                throw new ValidationException("description must not be blank");
+            }
             item.setDescription(patch.getDescription());
         }
         if (patch.getAvailable() != null) {
             item.setAvailable(patch.getAvailable());
         }
-        return ItemMapper.toItemDto(itemRepository.save(item));
+
+        final Item saved = itemRepository.save(item);
+        return ItemMapper.toItemDto(saved);
     }
 
     @Override
-    public ItemDto getById(Long requesterId, Long itemId) {
-        // requesterId оставлен для будущих спринтов
-        Item item = itemRepository.findById(itemId)
+    public ItemDetailsDto getById(final Long requesterId, final Long itemId) {
+        final Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new NotFoundException("Item not found: " + itemId));
-        return ItemMapper.toItemDto(item);
+
+        final List<Comment> comments = commentRepository.findByItem_Id(itemId);
+        return ItemMapper.toItemDetailsDto(item, comments.stream().map(CommentMapper::toDto).toList());
     }
 
     @Override
-    public List<ItemDto> getByOwner(Long ownerId) {
-        userRepository.findById(ownerId)
-                .orElseThrow(() -> new NotFoundException("Owner not found: " + ownerId));
-        return itemRepository.findByOwnerId(ownerId).stream()
-                .map(ItemMapper::toItemDto)
+    public List<ItemWithBookingsDto> getByOwner(final Long ownerId) {
+        final List<Item> items = itemRepository
+                .findByOwner_Id(ownerId, PageRequest.of(0, Integer.MAX_VALUE))
+                .getContent();
+
+        if (items.isEmpty()) {
+            return List.of();
+        }
+
+        final List<Long> itemIds = items.stream().map(Item::getId).toList();
+        final Map<Long, List<CommentDto>> commentsByItem = commentRepository.findByItem_IdIn(itemIds)
+                .stream()
+                .collect(Collectors.groupingBy(c -> c.getItem().getId(),
+                        Collectors.mapping(CommentMapper::toDto, Collectors.toList())));
+
+        final LocalDateTime now = LocalDateTime.now();
+
+        return items.stream()
+                .map(it -> {
+                    final Booking last = bookingRepository
+                            .findFirstByItem_IdAndStartBeforeOrderByEndDesc(it.getId(), now);
+                    final Booking next = bookingRepository
+                            .findFirstByItem_IdAndStartAfterAndStatusOrderByStartAsc(it.getId(), now, Booking.BookingStatus.APPROVED);
+                    return ItemMapper.toItemWithBookings(
+                            it,
+                            BookingMapper.toShort(last),
+                            BookingMapper.toShort(next),
+                            commentsByItem.getOrDefault(it.getId(), List.of())
+                    );
+                })
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<ItemDto> search(String text) {
         if (!StringUtils.hasText(text)) {
-            return List.of(); // пустой поисковый текст -> пустой результат
+            return List.of();
         }
-        final String query = text.toLowerCase(Locale.ROOT); // говорящая переменная
-        return itemRepository.findAll().stream()
-                .filter(Item::getAvailable)
-                .filter(item -> containsIgnoreCase(item.getName(), query)
-                        || containsIgnoreCase(item.getDescription(), query))
+        return itemRepository.search(text, PageRequest.of(0, Integer.MAX_VALUE))
+                .stream()
                 .map(ItemMapper::toItemDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    private boolean containsIgnoreCase(String source, String query) {
-        return source != null && source.toLowerCase(Locale.ROOT).contains(query);
+    @Override
+    public CommentDto addComment(final Long userId, final Long itemId, final CommentCreateDto comment) {
+        if (comment == null || !StringUtils.hasText(comment.text())) {
+            throw new ValidationException("comment text must not be blank");
+        }
+
+        final boolean canComment = bookingRepository
+                .existsByBooker_IdAndItem_IdAndStatusAndEndBefore(
+                        userId, itemId, Booking.BookingStatus.APPROVED, LocalDateTime.now());
+
+        if (!canComment) {
+            throw new ValidationException("Only users with finished approved booking can comment this item");
+        }
+
+        final Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new NotFoundException("Item not found: " + itemId));
+        final User author = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+
+        final Comment entity = Comment.builder()
+                .text(comment.text())
+                .item(item)
+                .author(author)
+                .created(LocalDateTime.now())
+                .build();
+
+        return CommentMapper.toDto(commentRepository.save(entity));
     }
 
-    private void validateNew(ItemDto dto) {
+    private void validateNew(final ItemDto dto) {
+        if (dto == null) {
+            throw new ValidationException("Item payload must not be null");
+        }
         if (!StringUtils.hasText(dto.getName())) {
             throw new ValidationException("name must not be blank");
         }

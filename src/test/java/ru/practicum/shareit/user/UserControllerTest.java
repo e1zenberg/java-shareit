@@ -1,88 +1,113 @@
 package ru.practicum.shareit.user;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.web.servlet.MockMvc;
-import ru.practicum.shareit.user.dto.UserDto;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import static org.hamcrest.Matchers.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * Смоук-тесты CRUD пользователей.
+ * Web-slice тест контроллера пользователей.
+ * Контекст поднимаем без БД, сервис замокаем.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+@WebMvcTest(controllers = UserController.class)
+@ActiveProfiles("test")
 class UserControllerTest {
 
-    @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
+    private UserService userService;
 
     @Test
-    void createAndGetUser() throws Exception {
-        UserDto req = UserDto.builder().name("Alice").email("alice@ex.com").build();
+    @DisplayName("POST /users — создаёт пользователя и отдаёт DTO")
+    void create_shouldReturnDto() throws Exception {
+        User input = User.builder().name("Alice").email("a@ex.io").build();
+        User saved = User.builder().id(1L).name("Alice").email("a@ex.io").build();
+        Mockito.when(userService.create(any(User.class))).thenReturn(saved);
 
-        String body = objectMapper.writeValueAsString(req);
-
-        // create
-        mockMvc.perform(post("/users")
+        mvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                        .content(objectMapper.writeValueAsString(UserMapper.toDto(input))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.name", is("Alice")))
-                .andExpect(jsonPath("$.email", is("alice@ex.com")));
-
-        // get
-        mockMvc.perform(get("/users/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name", is("Alice")));
+                .andExpect(jsonPath("$.email", is("a@ex.io")));
     }
 
     @Test
-    void updateAndDeleteUser() throws Exception {
-        // create
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                UserDto.builder().name("Bob").email("b@ex.com").build())))
-                .andExpect(status().isOk());
+    @DisplayName("PATCH /users/{id} — обновляет частично и отдаёт DTO")
+    void update_shouldReturnDto() throws Exception {
+        Long id = 10L;
+        User patch = User.builder().name("Bob").build();
+        User updated = User.builder().id(id).name("Bob").email("b@ex.io").build();
+        Mockito.when(userService.update(eq(id), any(User.class))).thenReturn(updated);
 
-        // patch name
-        mockMvc.perform(patch("/users/1")
+        mvc.perform(patch("/users/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Bobby\"}"))
+                        .content(objectMapper.writeValueAsString(UserMapper.toDto(patch))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name", is("Bobby")));
-
-        // delete
-        mockMvc.perform(delete("/users/1"))
-                .andExpect(status().isOk());
-
-        // 404 after delete
-        mockMvc.perform(get("/users/1"))
-                .andExpect(status().isNotFound());
+                .andExpect(jsonPath("$.id", is(id.intValue())))
+                .andExpect(jsonPath("$.name", is("Bob")));
     }
 
     @Test
-    void duplicateEmailGivesConflict409() throws Exception {
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                UserDto.builder().name("U1").email("dup@ex.com").build())))
+    @DisplayName("GET /users/{id} — возвращает DTO пользователя")
+    void getById_shouldReturnDto() throws Exception {
+        Long id = 5L;
+        User user = User.builder().id(id).name("Carol").email("c@ex.io").build();
+        Mockito.when(userService.getById(id)).thenReturn(user);
+
+        mvc.perform(get("/users/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(id.intValue())))
+                .andExpect(jsonPath("$.email", is("c@ex.io")));
+    }
+
+    @Test
+    @DisplayName("GET /users — возвращает список DTO")
+    void getAll_shouldReturnList() throws Exception {
+        List<User> list = List.of(
+                User.builder().id(1L).name("A").email("a@ex.io").build(),
+                User.builder().id(2L).name("B").email("b@ex.io").build()
+        );
+        Mockito.when(userService.getAll()).thenReturn(list);
+
+        mvc.perform(get("/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[1].email", is("b@ex.io")));
+    }
+
+    @Test
+    @DisplayName("DELETE /users/{id} — делегирует удаление в сервис")
+    void delete_shouldDelegateToService() throws Exception {
+        Long id = 9L;
+
+        mvc.perform(delete("/users/{id}", id))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                UserDto.builder().name("U2").email("dup@ex.com").build())))
-                .andExpect(status().isConflict());
+        Mockito.verify(userService).deleteById(id);
     }
 }

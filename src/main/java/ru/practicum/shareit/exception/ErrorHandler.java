@@ -14,21 +14,27 @@ import java.util.Map;
 @RestControllerAdvice
 public class ErrorHandler {
 
+    @ExceptionHandler(ValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> handleValidation(final ValidationException ex) {
+        return message(ex.getMessage());
+    }
+
     @ExceptionHandler(NotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Map<String, String> handleNotFound(NotFoundException ex) {
+    public Map<String, String> handleNotFound(final NotFoundException ex) {
         return message(ex.getMessage());
     }
 
     @ExceptionHandler(ConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public Map<String, String> handleConflict(ConflictException ex) {
+    public Map<String, String> handleConflict(final ConflictException ex) {
         return message(ex.getMessage());
     }
 
-    @ExceptionHandler(ValidationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Map<String, String> handleValidation(ValidationException ex) {
+    @ExceptionHandler(ForbiddenException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Map<String, String> handleForbidden(final ForbiddenException ex) {
         return message(ex.getMessage());
     }
 
