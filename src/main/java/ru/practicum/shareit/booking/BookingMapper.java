@@ -7,33 +7,36 @@ import ru.practicum.shareit.booking.dto.BookingShortDto;
 public final class BookingMapper {
     private BookingMapper() {}
 
-    public static BookingDto toDto(Booking b) {
+    public static BookingDto toDto(Booking booking) {
         return new BookingDto(
-                b.getId(),
-                b.getStart(),
-                b.getEnd(),
-                b.getItem() != null ? b.getItem().getId() : null,
-                b.getBooker() != null ? b.getBooker().getId() : null,
-                b.getStatus()
+                booking.getId(),
+                booking.getStart(),
+                booking.getEnd(),
+                booking.getItem() != null ? booking.getItem().getId() : null,
+                booking.getBooker() != null ? booking.getBooker().getId() : null,
+                booking.getStatus()
         );
     }
 
-    public static BookingShortDto toShort(Booking b) {
-        if (b == null) return null;
-        return new BookingShortDto(b.getId(), b.getBooker() != null ? b.getBooker().getId() : null);
+    public static BookingShortDto toShort(Booking booking) {
+        if (booking == null) return null;
+        return new BookingShortDto(
+                booking.getId(),
+                booking.getBooker() != null ? booking.getBooker().getId() : null
+        );
     }
 
-    public static BookingResponseDto fromDto(BookingDto d, String itemName) {
-        if (d == null) return null;
+    public static BookingResponseDto fromDto(BookingDto dto, String itemName) {
+        if (dto == null) return null;
         BookingResponseDto.ItemNestedDto item = null;
-        if (d.itemId() != null) {
-            item = new BookingResponseDto.ItemNestedDto(d.itemId(), itemName);
+        if (dto.itemId() != null) {
+            item = new BookingResponseDto.ItemNestedDto(dto.itemId(), itemName);
         }
         BookingResponseDto.BookerNestedDto booker = null;
-        if (d.bookerId() != null) {
-            booker = new BookingResponseDto.BookerNestedDto(d.bookerId());
+        if (dto.bookerId() != null) {
+            booker = new BookingResponseDto.BookerNestedDto(dto.bookerId());
         }
-        String status = d.status() != null ? d.status().name() : null;
-        return new BookingResponseDto(d.id(), d.start(), d.end(), status, item, booker);
+        String status = dto.status() != null ? dto.status().name() : null;
+        return new BookingResponseDto(dto.id(), dto.start(), dto.end(), status, item, booker);
     }
 }

@@ -49,9 +49,9 @@ public class BookingServiceImpl implements BookingService {
         }
 
         User booker = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new NotFoundException(String.format("User not found: %d", userId)));
         Item item = itemRepository.findById(dto.itemId())
-                .orElseThrow(() -> new NotFoundException("Item not found: " + dto.itemId()));
+                .orElseThrow(() -> new NotFoundException(String.format("Item not found: %d", dto.itemId())));
 
         if (item.getOwner() != null && Objects.equals(item.getOwner().getId(), userId)) {
             throw new NotFoundException("Owner cannot book own item");
@@ -74,7 +74,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public BookingDto approve(Long ownerId, Long bookingId, boolean approved) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new NotFoundException("Booking not found: " + bookingId));
+                .orElseThrow(() -> new NotFoundException(String.format("Booking not found: %d", bookingId)));
 
         Long itemOwnerId = booking.getItem().getOwner().getId();
         if (!itemOwnerId.equals(ownerId)) {
@@ -91,7 +91,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public BookingDto get(Long userId, Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new NotFoundException("Booking not found: " + bookingId));
+                .orElseThrow(() -> new NotFoundException(String.format("Booking not found: %d", bookingId)));
 
         Long ownerId = booking.getItem().getOwner().getId();
         Long bookerId = booking.getBooker().getId();
@@ -104,7 +104,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public List<BookingDto> listForUser(Long userId, BookingState state, int from, int size) {
         userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new NotFoundException(String.format("User not found: %d", userId)));
         validatePage(from, size);
 
         LocalDateTime now = LocalDateTime.now();
@@ -118,7 +118,7 @@ public class BookingServiceImpl implements BookingService {
             case WAITING -> page = bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.WAITING, pageRequest);
             case REJECTED -> page = bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.REJECTED, pageRequest);
             case ALL -> page = bookingRepository.findByBooker_Id(userId, pageRequest);
-            default -> throw new ValidationException("Unknown state: " + state);
+            default -> throw new ValidationException(String.format("Unknown state: %s", state));
         }
 
         return page.getContent().stream()
@@ -129,7 +129,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public List<BookingDto> listForOwner(Long ownerId, BookingState state, int from, int size) {
         userRepository.findById(ownerId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + ownerId));
+                .orElseThrow(() -> new NotFoundException(String.format("User not found: %d", ownerId)));
         validatePage(from, size);
 
         LocalDateTime now = LocalDateTime.now();
@@ -143,7 +143,7 @@ public class BookingServiceImpl implements BookingService {
             case WAITING -> page = bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.WAITING, pageRequest);
             case REJECTED -> page = bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.REJECTED, pageRequest);
             case ALL -> page = bookingRepository.findByItem_Owner_Id(ownerId, pageRequest);
-            default -> throw new ValidationException("Unknown state: " + state);
+            default -> throw new ValidationException(String.format("Unknown state: %s", state));
         }
 
         return page.getContent().stream()
