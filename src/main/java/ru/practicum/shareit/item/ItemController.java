@@ -72,12 +72,8 @@ public class ItemController {
                             itemId, now, Booking.BookingStatus.APPROVED);
                     BookingShortDto lastShort = BookingMapper.toShort(last);
                     BookingShortDto nextShort = BookingMapper.toShort(next);
-                    if (lastShort != null) {
-                        json.put("lastBooking", lastShort);
-                    }
-                    if (nextShort != null) {
-                        json.put("nextBooking", nextShort);
-                    }
+                    if (lastShort != null) json.put("lastBooking", lastShort);
+                    if (nextShort != null) json.put("nextBooking", nextShort);
                 }
             });
         }
