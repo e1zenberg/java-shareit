@@ -35,7 +35,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public BookingDto create(Long userId, BookingCreateDto dto) {
         if (dto == null) {
-            throw new ValidationException("Booking payload must not be null");
+            throw new ValidationException("start and end must be provided");
         }
         if (dto.start() == null || dto.end() == null) {
             throw new ValidationException("start and end must be provided");
@@ -112,23 +112,13 @@ public class BookingServiceImpl implements BookingService {
 
         Page<Booking> page;
         switch (state) {
-            case CURRENT:
-                page = bookingRepository.findByBooker_IdAndStartBeforeAndEndAfter(userId, now, now, pageRequest);
-                break;
-            case PAST:
-                page = bookingRepository.findByBooker_IdAndEndBefore(userId, now, pageRequest);
-                break;
-            case FUTURE:
-                page = bookingRepository.findByBooker_IdAndStartAfter(userId, now, pageRequest);
-                break;
-            case WAITING:
-                page = bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.WAITING, pageRequest);
-                break;
-            case REJECTED:
-                page = bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.REJECTED, pageRequest);
-                break;
-            default:
-                page = bookingRepository.findByBooker_Id(userId, pageRequest);
+            case CURRENT -> page = bookingRepository.findByBooker_IdAndStartBeforeAndEndAfter(userId, now, now, pageRequest);
+            case PAST -> page = bookingRepository.findByBooker_IdAndEndBefore(userId, now, pageRequest);
+            case FUTURE -> page = bookingRepository.findByBooker_IdAndStartAfter(userId, now, pageRequest);
+            case WAITING -> page = bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.WAITING, pageRequest);
+            case REJECTED -> page = bookingRepository.findByBooker_IdAndStatus(userId, BookingStatus.REJECTED, pageRequest);
+            case ALL -> page = bookingRepository.findByBooker_Id(userId, pageRequest);
+            default -> throw new ValidationException("Unknown state: " + state);
         }
 
         return page.getContent().stream()
@@ -147,23 +137,13 @@ public class BookingServiceImpl implements BookingService {
 
         Page<Booking> page;
         switch (state) {
-            case CURRENT:
-                page = bookingRepository.findByItem_Owner_IdAndStartBeforeAndEndAfter(ownerId, now, now, pageRequest);
-                break;
-            case PAST:
-                page = bookingRepository.findByItem_Owner_IdAndEndBefore(ownerId, now, pageRequest);
-                break;
-            case FUTURE:
-                page = bookingRepository.findByItem_Owner_IdAndStartAfter(ownerId, now, pageRequest);
-                break;
-            case WAITING:
-                page = bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.WAITING, pageRequest);
-                break;
-            case REJECTED:
-                page = bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.REJECTED, pageRequest);
-                break;
-            default:
-                page = bookingRepository.findByItem_Owner_Id(ownerId, pageRequest);
+            case CURRENT -> page = bookingRepository.findByItem_Owner_IdAndStartBeforeAndEndAfter(ownerId, now, now, pageRequest);
+            case PAST -> page = bookingRepository.findByItem_Owner_IdAndEndBefore(ownerId, now, pageRequest);
+            case FUTURE -> page = bookingRepository.findByItem_Owner_IdAndStartAfter(ownerId, now, pageRequest);
+            case WAITING -> page = bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.WAITING, pageRequest);
+            case REJECTED -> page = bookingRepository.findByItem_Owner_IdAndStatus(ownerId, BookingStatus.REJECTED, pageRequest);
+            case ALL -> page = bookingRepository.findByItem_Owner_Id(ownerId, pageRequest);
+            default -> throw new ValidationException("Unknown state: " + state);
         }
 
         return page.getContent().stream()

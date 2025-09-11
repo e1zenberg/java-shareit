@@ -2,7 +2,6 @@ package ru.practicum.shareit.item;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import ru.practicum.shareit.booking.Booking;
@@ -10,7 +9,11 @@ import ru.practicum.shareit.booking.BookingMapper;
 import ru.practicum.shareit.booking.BookingRepository;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.exception.ValidationException;
-import ru.practicum.shareit.item.dto.*;
+import ru.practicum.shareit.item.dto.CommentCreateDto;
+import ru.practicum.shareit.item.dto.CommentDto;
+import ru.practicum.shareit.item.dto.ItemDetailsDto;
+import ru.practicum.shareit.item.dto.ItemDto;
+import ru.practicum.shareit.item.dto.ItemWithBookingsDto;
 import ru.practicum.shareit.item.model.Comment;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.storage.CommentRepository;
@@ -19,14 +22,13 @@ import ru.practicum.shareit.user.User;
 import ru.practicum.shareit.user.storage.UserRepository;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ItemServiceImpl implements ItemService {
-
-    private static final Sort SORT_BY_START_DESC = Sort.by(Sort.Direction.DESC, "start");
 
     private final ItemRepository itemRepository;
     private final CommentRepository commentRepository;
@@ -60,22 +62,27 @@ public class ItemServiceImpl implements ItemService {
             throw new NotFoundException("Only owner can edit item");
         }
 
-        if (patch != null) {
-            if (StringUtils.hasText(patch.getName())) {
-                item.setName(patch.getName());
+        if (patch == null) {
+            throw new ValidationException("Item patch must not be null");
+        }
+        if (patch.getName() != null) {
+            if (!StringUtils.hasText(patch.getName())) {
+                throw new ValidationException("name must not be blank");
             }
-            if (patch.getDescription() != null) {
-                if (!StringUtils.hasText(patch.getDescription())) {
-                    throw new ValidationException("description must not be blank");
-                }
-                item.setDescription(patch.getDescription());
+            item.setName(patch.getName());
+        }
+        if (patch.getDescription() != null) {
+            if (!StringUtils.hasText(patch.getDescription())) {
+                throw new ValidationException("description must not be blank");
             }
-            if (patch.getAvailable() != null) {
-                item.setAvailable(patch.getAvailable());
-            }
+            item.setDescription(patch.getDescription());
+        }
+        if (patch.getAvailable() != null) {
+            item.setAvailable(patch.getAvailable());
         }
 
-        return ItemMapper.toItemDto(itemRepository.save(item));
+        final Item saved = itemRepository.save(item);
+        return ItemMapper.toItemDto(saved);
     }
 
     @Override
@@ -84,8 +91,6 @@ public class ItemServiceImpl implements ItemService {
                 .orElseThrow(() -> new NotFoundException("Item not found: " + itemId));
 
         final List<Comment> comments = commentRepository.findByItem_Id(itemId);
-
-        // last/next — только для владельца в списке вещей; на карточке можно вернуть без них
         return ItemMapper.toItemDetailsDto(item, comments.stream().map(CommentMapper::toDto).toList());
     }
 
@@ -124,15 +129,14 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public List<ItemDto> search(final String text) {
+    public List<ItemDto> search(String text) {
         if (!StringUtils.hasText(text)) {
-            // тест "Item search empty" ожидает пустой список
-            return List.of(); // 200 OK
+            return List.of();
         }
         return itemRepository.search(text, PageRequest.of(0, Integer.MAX_VALUE))
                 .stream()
                 .map(ItemMapper::toItemDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
@@ -146,7 +150,6 @@ public class ItemServiceImpl implements ItemService {
                         userId, itemId, Booking.BookingStatus.APPROVED, LocalDateTime.now());
 
         if (!canComment) {
-            // тест «Comment approved booking» ждёт 400, если бронь в будущем/не закончилась
             throw new ValidationException("Only users with finished approved booking can comment this item");
         }
 
@@ -176,7 +179,6 @@ public class ItemServiceImpl implements ItemService {
             throw new ValidationException("description must not be blank");
         }
         if (dto.getAvailable() == null) {
-            // тест «Item create without available field» ожидает 400
             throw new ValidationException("available must not be null");
         }
     }
