@@ -1,21 +1,14 @@
 package ru.practicum.shareit.item;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.shareit.booking.Booking;
-import ru.practicum.shareit.booking.BookingMapper;
-import ru.practicum.shareit.booking.BookingRepository;
-import ru.practicum.shareit.booking.dto.BookingShortDto;
 import ru.practicum.shareit.exception.ValidationException;
 import ru.practicum.shareit.item.dto.CommentCreateDto;
 import ru.practicum.shareit.item.dto.CommentDto;
 import ru.practicum.shareit.item.dto.ItemDetailsDto;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.dto.ItemWithBookingsDto;
-import ru.practicum.shareit.item.storage.ItemRepository;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +21,6 @@ public class ItemController {
     private static final String USER_HEADER = "X-Sharer-User-Id";
 
     private final ItemService itemService;
-    private final ObjectProvider<ItemRepository> itemRepositoryProvider;
-    private final ObjectProvider<BookingRepository> bookingRepositoryProvider;
 
     @PostMapping
     public ItemDto create(@RequestHeader(USER_HEADER) Long ownerId,
@@ -57,26 +48,8 @@ public class ItemController {
         json.put("ownerId", dto.ownerId());
         json.put("requestId", dto.requestId());
         json.put("comments", dto.comments());
-
-        ItemRepository itemRepo = itemRepositoryProvider.getIfAvailable();
-        BookingRepository bookingRepo = bookingRepositoryProvider.getIfAvailable();
-
-        if (itemRepo != null && bookingRepo != null) {
-            itemRepo.findById(itemId).ifPresent(item -> {
-                if (item.getOwner() != null && item.getOwner().getId() != null
-                        && item.getOwner().getId().equals(requesterId)) {
-                    LocalDateTime now = LocalDateTime.now();
-                    Booking last = bookingRepo.findFirstByItem_IdAndStartBeforeAndStatusOrderByEndDesc(
-                            itemId, now, Booking.BookingStatus.APPROVED);
-                    Booking next = bookingRepo.findFirstByItem_IdAndStartAfterAndStatusOrderByStartAsc(
-                            itemId, now, Booking.BookingStatus.APPROVED);
-                    BookingShortDto lastShort = BookingMapper.toShort(last);
-                    BookingShortDto nextShort = BookingMapper.toShort(next);
-                    if (lastShort != null) json.put("lastBooking", lastShort);
-                    if (nextShort != null) json.put("nextBooking", nextShort);
-                }
-            });
-        }
+        json.put("lastBooking", null);
+        json.put("nextBooking", null);
 
         return json;
     }
