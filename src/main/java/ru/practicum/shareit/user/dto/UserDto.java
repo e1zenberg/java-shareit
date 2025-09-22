@@ -1,20 +1,13 @@
 package ru.practicum.shareit.user.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.experimental.FieldDefaults;
-import lombok.AccessLevel;
+import lombok.Value;
 
 /**
- * DTO пользователя для REST.
+ * DTO пользователя для слоёв представления/транспорта.
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Value
 @Builder
-@FieldDefaults(level = AccessLevel.PRIVATE) // по умолчанию делаем поля приватными (исключаем дублирование модификаторов)
 public class UserDto {
     Long id;
     String name;
