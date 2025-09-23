@@ -1,0 +1,22 @@
+server:
+  port: 9090
+  address: 0.0.0.0
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/shareit}
+    username: ${SPRING_DATASOURCE_USERNAME:shareit}
+    password: ${SPRING_DATASOURCE_PASSWORD:shareit}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+  sql:
+    init:
+      mode: always
+
+logging:
+  level:
+    root: INFO
