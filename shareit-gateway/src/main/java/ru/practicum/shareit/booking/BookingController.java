@@ -1,74 +1,60 @@
 package ru.practicum.shareit.booking;
 
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
+import ru.practicum.shareit.booking.dto.BookItemRequestDto;
+import ru.practicum.shareit.booking.dto.BookingState;
 
-import java.util.Map;
-
-@RestController
+@Controller
 @RequestMapping("/bookings")
+@RequiredArgsConstructor
+@Validated
 public class BookingController {
 
-    private final RestTemplate restTemplate;
+    private static final String USER_HEADER = "X-Sharer-User-Id";
 
-    public BookingController(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
+    private final BookingClient bookingClient;
 
     @PostMapping
-    public ResponseEntity<Object> createBooking(@RequestHeader("X-Sharer-User-Id") long userId,
-                                                @RequestBody Map<String, Object> requestBody) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-        return restTemplate.exchange("/bookings", HttpMethod.POST, entity, Object.class);
+    public ResponseEntity<Object> create(@RequestHeader(USER_HEADER) long userId,
+                                         @RequestBody @Valid BookItemRequestDto requestDto) {
+        return bookingClient.bookItem(userId, requestDto);
     }
 
     @PatchMapping("/{bookingId}")
-    public ResponseEntity<Object> approveBooking(@RequestHeader("X-Sharer-User-Id") long userId,
-                                                 @PathVariable("bookingId") long bookingId,
-                                                 @RequestParam(name = "approved") boolean approved) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        String path = "/bookings/{bookingId}?approved={approved}";
-        return restTemplate.exchange(path, HttpMethod.PATCH, entity, Object.class, bookingId, approved);
+    public ResponseEntity<Object> approve(@RequestHeader(USER_HEADER) long ownerId,
+                                          @PathVariable long bookingId,
+                                          @RequestParam("approved") boolean approved) {
+        return bookingClient.approve(ownerId, bookingId, approved);
     }
 
     @GetMapping("/{bookingId}")
-    public ResponseEntity<Object> getBooking(@RequestHeader("X-Sharer-User-Id") long userId,
-                                             @PathVariable("bookingId") long bookingId) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        return restTemplate.exchange("/bookings/{bookingId}", HttpMethod.GET, entity, Object.class, bookingId);
+    public ResponseEntity<Object> get(@RequestHeader(USER_HEADER) long userId,
+                                      @PathVariable long bookingId) {
+        return bookingClient.getBooking(userId, bookingId);
     }
 
     @GetMapping
-    public ResponseEntity<Object> getUserBookings(@RequestHeader("X-Sharer-User-Id") long userId,
-                                                  @RequestParam(name = "state", defaultValue = "ALL") String state,
-                                                  @RequestParam(name = "from", defaultValue = "0") int from,
-                                                  @RequestParam(name = "size", defaultValue = "10") int size) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        String path = "/bookings?state={state}&from={from}&size={size}";
-        return restTemplate.exchange(path, HttpMethod.GET, entity, Object.class, state, from, size);
+    public ResponseEntity<Object> getForUser(@RequestHeader(USER_HEADER) long userId,
+                                             @RequestParam(name = "state", defaultValue = "ALL") String state,
+                                             @PositiveOrZero @RequestParam(name = "from", defaultValue = "0") Integer from,
+                                             @Positive @RequestParam(name = "size", defaultValue = "10") Integer size) {
+        BookingState parsed = BookingState.valueOf(state);
+        return bookingClient.getBookings(userId, parsed, from, size);
     }
 
     @GetMapping("/owner")
-    public ResponseEntity<Object> getOwnerBookings(@RequestHeader("X-Sharer-User-Id") long userId,
-                                                   @RequestParam(name = "state", defaultValue = "ALL") String state,
-                                                   @RequestParam(name = "from", defaultValue = "0") int from,
-                                                   @RequestParam(name = "size", defaultValue = "10") int size) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        String path = "/bookings/owner?state={state}&from={from}&size={size}";
-        return restTemplate.exchange(path, HttpMethod.GET, entity, Object.class, state, from, size);
+    public ResponseEntity<Object> getForOwner(@RequestHeader(USER_HEADER) long ownerId,
+                                              @RequestParam(name = "state", defaultValue = "ALL") String state,
+                                              @PositiveOrZero @RequestParam(name = "from", defaultValue = "0") Integer from,
+                                              @Positive @RequestParam(name = "size", defaultValue = "10") Integer size) {
+        BookingState parsed = BookingState.valueOf(state);
+        return bookingClient.getBookingsOwner(ownerId, parsed, from, size);
     }
 }
