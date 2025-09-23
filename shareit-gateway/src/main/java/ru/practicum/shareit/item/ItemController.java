@@ -1,68 +1,78 @@
 package ru.practicum.shareit.item;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.shareit.item.dto.CommentCreateDto;
-import ru.practicum.shareit.item.dto.ItemDto;
+import org.springframework.web.client.RestTemplate;
 
-@Controller
+import java.util.Map;
+
+@RestController
 @RequestMapping("/items")
-@RequiredArgsConstructor
-@Slf4j
-@Validated
 public class ItemController {
 
-    private static final String USER_HEADER = "X-Sharer-User-Id";
+    private final RestTemplate restTemplate;
 
-    private final ItemClient itemClient;
+    public ItemController(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     @PostMapping
-    public ResponseEntity<Object> create(@RequestHeader(USER_HEADER) long ownerId,
-                                         @RequestBody @Valid ItemDto dto) {
-        log.info("Create item by userId={}", ownerId);
-        return itemClient.create(ownerId, dto);
+    public ResponseEntity<Object> createItem(@RequestHeader("X-Sharer-User-Id") long userId,
+                                             @RequestBody Map<String, Object> requestBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Sharer-User-Id", String.valueOf(userId));
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        return restTemplate.exchange("/items", HttpMethod.POST, entity, Object.class);
     }
 
     @PatchMapping("/{itemId}")
-    public ResponseEntity<Object> update(@RequestHeader(USER_HEADER) long ownerId,
-                                         @PathVariable(name = "itemId") long itemId,
-                                         @RequestBody ItemDto patch) {
-        log.info("Update item {} by userId={}", itemId, ownerId);
-        return itemClient.update(ownerId, itemId, patch);
+    public ResponseEntity<Object> updateItem(@RequestHeader("X-Sharer-User-Id") long userId,
+                                             @PathVariable("itemId") long itemId,
+                                             @RequestBody Map<String, Object> requestBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Sharer-User-Id", String.valueOf(userId));
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        return restTemplate.exchange("/items/{itemId}", HttpMethod.PATCH, entity, Object.class, itemId);
     }
 
     @GetMapping("/{itemId}")
-    public ResponseEntity<Object> getById(@RequestHeader(USER_HEADER) long requesterId,
-                                          @PathVariable(name = "itemId") long itemId) {
-        return itemClient.getById(requesterId, itemId);
+    public ResponseEntity<Object> getItem(@RequestHeader("X-Sharer-User-Id") long userId,
+                                          @PathVariable("itemId") long itemId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Sharer-User-Id", String.valueOf(userId));
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        return restTemplate.exchange("/items/{itemId}", HttpMethod.GET, entity, Object.class, itemId);
     }
 
     @GetMapping
-    public ResponseEntity<Object> getByOwner(@RequestHeader(USER_HEADER) long ownerId,
-                                             @PositiveOrZero @RequestParam(name = "from", defaultValue = "0") Integer from,
-                                             @Positive @RequestParam(name = "size", defaultValue = "10") Integer size) {
-        return itemClient.getByOwner(ownerId, from, size);
+    public ResponseEntity<Object> getOwnerItems(@RequestHeader("X-Sharer-User-Id") long userId,
+                                                @RequestParam(name = "from", defaultValue = "0") int from,
+                                                @RequestParam(name = "size", defaultValue = "10") int size) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Sharer-User-Id", String.valueOf(userId));
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        String path = "/items?from={from}&size={size}";
+        return restTemplate.exchange(path, HttpMethod.GET, entity, Object.class, from, size);
     }
 
     @GetMapping("/search")
-    public ResponseEntity<Object> search(@RequestParam(name = "text") String text) {
-        if (text == null || text.trim().isEmpty()) {
-            return ResponseEntity.ok().body(java.util.List.of());
-        }
-        return itemClient.search(text);
+    public ResponseEntity<Object> searchItems(@RequestParam(name = "text") String text,
+                                              @RequestParam(name = "from", defaultValue = "0") int from,
+                                              @RequestParam(name = "size", defaultValue = "10") int size) {
+        String path = "/items/search?text={text}&from={from}&size={size}";
+        return restTemplate.getForEntity(path, Object.class, text, from, size);
     }
 
     @PostMapping("/{itemId}/comment")
-    public ResponseEntity<Object> addComment(@RequestHeader(USER_HEADER) long userId,
-                                             @PathVariable(name = "itemId") long itemId,
-                                             @RequestBody @Valid CommentCreateDto comment) {
-        return itemClient.addComment(userId, itemId, comment);
+    public ResponseEntity<Object> addComment(@RequestHeader("X-Sharer-User-Id") long userId,
+                                             @PathVariable("itemId") long itemId,
+                                             @RequestBody Map<String, Object> requestBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Sharer-User-Id", String.valueOf(userId));
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        return restTemplate.exchange("/items/{itemId}/comment", HttpMethod.POST, entity, Object.class, itemId);
     }
 }
