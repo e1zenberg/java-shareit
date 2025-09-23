@@ -14,7 +14,6 @@
 	<artifactId>shareit-server</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>ShareIt Server</name>
-	<packaging>jar</packaging>
 
 	<properties>
 		<java.version>21</java.version>
@@ -42,20 +41,9 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-configuration-processor</artifactId>
-			<optional>true</optional>
+			<scope>test</scope>
 		</dependency>
 
 		<dependency>
@@ -65,16 +53,15 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.3.0</version>
 		</dependency>
 
 		<dependency>
-			<groupId>com.google.code.findbugs</groupId>
-			<artifactId>jsr305</artifactId>
-			<version>3.0.2</version>
-			<scope>provided</scope>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 
@@ -95,6 +82,28 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<mkdir dir="${project.basedir}/../server/target"/>
+								<copy file="${project.build.directory}/${project.build.finalName}.jar"
+									  todir="${project.basedir}/../server/target" overwrite="true"/>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
+
 </project>
