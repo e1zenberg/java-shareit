@@ -15,6 +15,9 @@ import java.util.Map;
 @RequestMapping("/requests")
 public class ItemRequestController {
 
+    private static final String USER_ID_HEADER = "X-Sharer-User-Id";
+    private static final String REQUESTS_PATH = "/requests";
+
     private final RestTemplate restTemplate;
 
     public ItemRequestController(RestTemplate restTemplate) {
@@ -22,39 +25,37 @@ public class ItemRequestController {
     }
 
     @PostMapping
-    public ResponseEntity<Object> createRequest(@RequestHeader("X-Sharer-User-Id") long userId,
+    public ResponseEntity<Object> createRequest(@RequestHeader(USER_ID_HEADER) long userId,
                                                 @RequestBody Map<String, Object> body) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        return restTemplate.exchange("/requests", HttpMethod.POST, entity, Object.class);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headersWithUserId(userId));
+        return restTemplate.exchange(REQUESTS_PATH, HttpMethod.POST, entity, Object.class);
     }
 
     @GetMapping
-    public ResponseEntity<Object> getOwn(@RequestHeader("X-Sharer-User-Id") long userId) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        return restTemplate.exchange("/requests", HttpMethod.GET, entity, Object.class);
+    public ResponseEntity<Object> getOwn(@RequestHeader(USER_ID_HEADER) long userId) {
+        HttpEntity<Void> entity = new HttpEntity<>(headersWithUserId(userId));
+        return restTemplate.exchange(REQUESTS_PATH, HttpMethod.GET, entity, Object.class);
     }
 
     @GetMapping("/all")
-    public ResponseEntity<Object> getAll(@RequestHeader("X-Sharer-User-Id") long userId,
+    public ResponseEntity<Object> getAll(@RequestHeader(USER_ID_HEADER) long userId,
                                          @RequestParam(value = "from", defaultValue = "0") Integer from,
                                          @RequestParam(value = "size", defaultValue = "10") Integer size) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        String path = "/requests/all?from={from}&size={size}";
+        HttpEntity<Void> entity = new HttpEntity<>(headersWithUserId(userId));
+        String path = REQUESTS_PATH + "/all?from={from}&size={size}";
         return restTemplate.exchange(path, HttpMethod.GET, entity, Object.class, from, size);
     }
 
     @GetMapping("/{requestId}")
-    public ResponseEntity<Object> getById(@RequestHeader("X-Sharer-User-Id") long userId,
+    public ResponseEntity<Object> getById(@RequestHeader(USER_ID_HEADER) long userId,
                                           @PathVariable("requestId") long requestId) {
+        HttpEntity<Void> entity = new HttpEntity<>(headersWithUserId(userId));
+        return restTemplate.exchange(REQUESTS_PATH + "/{requestId}", HttpMethod.GET, entity, Object.class, requestId);
+    }
+
+    private HttpHeaders headersWithUserId(long userId) {
         HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Sharer-User-Id", String.valueOf(userId));
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-        return restTemplate.exchange("/requests/{requestId}", HttpMethod.GET, entity, Object.class, requestId);
+        headers.set(USER_ID_HEADER, Long.toString(userId));
+        return headers;
     }
 }
