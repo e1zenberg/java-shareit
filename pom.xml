@@ -102,7 +102,6 @@
                                 <configuration>
                                     <configLocation>checkstyle.xml</configLocation>
                                     <suppressionsLocation>suppressions.xml</suppressionsLocation>
-                                    <encoding>UTF-8</encoding>
                                     <consoleOutput>true</consoleOutput>
                                     <failsOnError>true</failsOnError>
                                 </configuration>

@@ -5,7 +5,9 @@ import ru.practicum.shareit.booking.dto.BookingResponseDto;
 import ru.practicum.shareit.booking.dto.BookingShortDto;
 
 public final class BookingMapper {
-    private BookingMapper() {}
+    private BookingMapper() {
+
+    }
 
     public static BookingDto toDto(Booking booking) {
         return new BookingDto(
